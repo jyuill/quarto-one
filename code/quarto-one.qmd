@@ -1,0 +1,22 @@
+---
+title: "Quarto One"
+author: "JY"
+format: 
+  html:
+    self-contained: true
+editor: visual
+---
+
+## Quarto One
+
+My first real quarto document to check out the system.
+
+Basic setup although I added 'self-contained: true' to YAML so keep output in one html file.
+
+## BC Beer Data
+
+![](images/bc_ldb.png){fig-align="left" width="200"}
+
+Data obtained from [BC Liquor Market Review](https://www.bcldb.com/publications/liquor-market-review "link to BC Liquor Market Review"), a quarterly report from BC Liquor Distribution Branch.
+
+![what here](images/lmr_qrtrly_rpt){fig-alt="there" width="988" height="100"}
