@@ -4,19 +4,88 @@ author: "JY"
 format: 
   html:
     self-contained: true
+    toc: true
+    theme: cosmo
+execute:
+  echo: false
+knitr: 
+  opts_chunk: 
+    message: false
+    warning: false
 editor: visual
 ---
+
+```{r}
+#| label: load packages
+#| include: false
+library(here)
+library(tidyverse)
+library(lubridate)
+library(scales)
+```
 
 ## Quarto One
 
 My first real quarto document to check out the system.
 
-Basic setup although I added 'self-contained: true' to YAML so keep output in one html file.
+Basic setup with more advanced YAML.
+
+Quarto references:
+
+-   [Quarto.org](https://quarto.org/)
+
+-   [Guides on various topics](https://quarto.org/docs/guide/)
 
 ## BC Beer Data
 
-![](images/bc_ldb.png){fig-align="left" width="200"}
+![](../images/bc_ldb.png){fig-align="left" width="200"}
 
 Data obtained from [BC Liquor Market Review](https://www.bcldb.com/publications/liquor-market-review "link to BC Liquor Market Review"), a quarterly report from BC Liquor Distribution Branch.
 
-![what here](images/lmr_qrtrly_rpt){fig-alt="there" width="988" height="100"}
+[![Fig 1. LMR thumbnail](../images/LMR_thumbnail.png){fig-alt="Thumbnail image and link to LMR" fig-align="left" width="83"}](https://www.bcldb.com/publications/liquor-market-review)
+
+::: callout-note
+## Callout: Fun fact note
+
+Beer is good! Beer is for everybody!
+:::
+
+### What's in the data?
+
+```{r}
+#| label: get data
+beer_data <- read_csv(here('data','beer_sales.csv'))
+#summary(beer_data)
+```
+
+Categories:
+
+```{r}
+unique(beer_data$category)
+```
+
+Date range:
+
+```{r}
+start <- min(beer_data$end_qtr_dt)
+end <- max(beer_data$end_qtr_dt)
+```
+
+From `r start` to `r end`
+
+## Stats
+
+```{r}
+
+```
+
+```{r}
+# set upper limit for axis
+sales_smry <- beer_data %>% group_by(end_qtr_dt) %>% summarize(sales=sum(netsales))
+max_sales <- max(sales_smry$sales)
+beer_data %>% ggplot(aes(x=as.factor(end_qtr_dt), y=netsales, fill=category))+
+  geom_col()+
+  scale_y_continuous(labels=comma, limits=c(0, max_sales), expand=expansion(mult=c(0,0.1)))+
+  labs(title='Net BC Beer Sales by Category', x="")+
+  theme_bw()+theme(axis.ticks.x = element_blank())
+```
