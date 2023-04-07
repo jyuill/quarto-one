@@ -22,6 +22,11 @@ library(here)
 library(tidyverse)
 library(lubridate)
 library(scales)
+library(plotly)
+
+# general settings
+theme_set <- theme_bw()
+pn_colors <- c("red3","forestgreen") # for positive, negative conditional formatting
 ```
 
 ## Quarto One
@@ -76,16 +81,119 @@ From `r start` to `r end`
 ## Stats
 
 ```{r}
+# prepare data at different levels of aggregation
+# qtrly totals with period over period absolute change and percent change
+beer_data_ttl <- beer_data %>% group_by(end_qtr_dt) %>% summarize(
+  netsales=sum(netsales)
+) %>% mutate(
+  pop_chg=netsales-lag(netsales),
+  pop_chg_pc=netsales/lag(netsales)-1,
+  posneg=ifelse(pop_chg>0, "pos","neg")
+) %>% ungroup()
+# change based on same qtr prev
+beer_data_qtrs <- beer_data %>% group_by(end_qtr_dt, fyr, qtr) %>% summarize(
+  netsales=sum(netsales)
+) %>% arrange(qtr, fyr) %>% 
+  ungroup() %>%
+  group_by(qtr) %>%
+  mutate(
+  pop_chg=netsales-lag(netsales),
+  pop_chg_pc=netsales/lag(netsales)-1
+) %>% ungroup()
 
+beer_data_cat <- beer_data %>% group_by(end_qtr_dt, category) %>% summarize(
+  netsales=sum(netsales) 
+) %>% group_by(category) %>% 
+  mutate(
+  pop_chg=netsales-lag(netsales),
+  pop_chg_pc=netsales/lag(netsales)-1
+) %>% ungroup()
+```
+
+### Overall View
+
+#### Totals by Quarter
+
+```{r}
+ch_title <- "BC Beer: Total Net Sales by Quarter"
+beer_data_ttl %>% ggplot(aes(x=as.factor(end_qtr_dt), y=netsales))+
+  geom_line(group=1)+
+  scale_y_continuous(labels=dollar_format())+
+  labs(title=ch_title, x="", y="")+
+  theme_bw()
+```
+
+#### Compared by Same Quarter
+
+More data needed
+
+#### % change
+
+```{r}
+
+ch_title <- "% Change in Qtr over Qtr Beer Sales"
+beer_data_ttl %>% 
+  filter(!is.na(pop_chg_pc)) %>%
+  ggplot(aes(x=as.factor(end_qtr_dt), y=pop_chg_pc, fill=posneg))+
+  geom_col()+
+  geom_hline(yintercept=0)+
+  scale_y_continuous(labels=percent_format())+
+  scale_fill_manual(values=pn_colors)+
+  theme_classic()+theme(axis.ticks.x=element_blank())+
+  theme(legend.position = "none")+
+  labs(title=ch_title, x="", y="")
+```
+
+### By Category
+
+```{r}
+# set max y scale
+max_sales <- max(beer_data_ttl$netsales)
+# reorder categories to show largest from bottom 
+## can also reorder with: fill=reorder(category, netsales) - creates ugly leg. title
+beer_data_cat$category <- reorder(beer_data_cat$category, beer_data_cat$netsales)
+# set up plot
+ttl_plot <- beer_data_cat %>% 
+  ggplot(aes(x=as.factor(end_qtr_dt), y=netsales, fill=category))+
+  geom_col()+
+  scale_fill_viridis_d(reverse=TRUE)+
+  scale_y_continuous(labels=dollar_format(), limits=c(0, max_sales), expand=expansion(mult=c(0,0.1)))+
+  labs(title='Total Net BC Beer Sales by Category', x="", y="")+
+  theme_bw()+theme(axis.ticks.x = element_blank())
+# output plotly version
+ggplotly(ttl_plot)
+```
+
+```{r}
+# % breakdown
+ch_title <- "% Breakdown by Category"
+beer_data_cat$category <- reorder(beer_data_cat$category, beer_data_cat$netsales)
+bdc_chart <- beer_data_cat %>% 
+  ggplot(aes(x=as.factor(end_qtr_dt), y=netsales, fill=category))+
+  geom_col(position="fill")+
+  scale_y_continuous(labels=percent_format(), expand=expansion(mult=c(0,0)))+
+  labs(title=ch_title, x="", y="")+
+  theme_bw()+theme(axis.ticks.x=element_blank())
+ggplotly(bdc_chart)
 ```
 
 ```{r}
 # set upper limit for axis
-sales_smry <- beer_data %>% group_by(end_qtr_dt) %>% summarize(sales=sum(netsales))
-max_sales <- max(sales_smry$sales)
-beer_data %>% ggplot(aes(x=as.factor(end_qtr_dt), y=netsales, fill=category))+
-  geom_col()+
+max_sales <- max(beer_data_cat$netsales)
+# generate plot from data
+beer_data_cat %>% ggplot(aes(x=as.factor(end_qtr_dt), y=netsales, fill=category))+
+  geom_col(position=position_dodge())+
   scale_y_continuous(labels=comma, limits=c(0, max_sales), expand=expansion(mult=c(0,0.1)))+
-  labs(title='Net BC Beer Sales by Category', x="")+
+  labs(title='Total Net BC Beer Sales by Category', x="")+
   theme_bw()+theme(axis.ticks.x = element_blank())
 ```
+
+### QoQ % Change
+
+Total
+
+```{r}
+
+```
+
+By Category
