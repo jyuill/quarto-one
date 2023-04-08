@@ -96,7 +96,6 @@ tbl
 
 ```
 
-
 ```{r}
 start <- min(beer_data$end_qtr_dt)
 end <- max(beer_data$end_qtr_dt)
