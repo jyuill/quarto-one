@@ -23,10 +23,17 @@ library(tidyverse)
 library(lubridate)
 library(scales)
 library(plotly)
+library(viridis)
+library(RColorBrewer)
+library(gt)
 
 # general settings
 theme_set <- theme_bw()
-pn_colors <- c("red3","forestgreen") # for positive, negative conditional formatting
+theme_set(theme_bw())
+#pn_colors <- c("red3","forestgreen") # for positive, negative conditional formatting
+pn_pal <- brewer.pal(3,"Set1")
+pn_colors <- c(pn_pal[1],pn_pal[3])
+cat_pal <- brewer.pal(9, "YlGnBu")
 ```
 
 ## Quarto One
@@ -66,17 +73,36 @@ beer_data <- read_csv(here('data','beer_sales.csv'))
 Categories:
 
 ```{r}
-unique(beer_data$category)
+#unique(beer_data$category)
+
+# categories
+cat <- beer_data %>% group_by(category) %>% summarize(count=n()) %>% ungroup()
+tbl_cat <- gt(cat[,1])
+tbl_cat
+
+# categories + subcategories
+cat_subcat <- beer_data %>% group_by(category, subcategory) %>% summarize(count=n()) %>%
+  ungroup()
+tbl <- gt(cat_subcat[,1:2])
+#tbl <- gt(cat_subcat)
+#tbl <- tbl %>% tab_header(
+#  title="Categories & Subcategories"
+#)
+#tbl <- tbl %>% tab_spanner(
+#  label = "Cats and Subcats",
+#  columns = c("category","subcategory")
+#)
+tbl
+
 ```
 
-Date range:
 
 ```{r}
 start <- min(beer_data$end_qtr_dt)
 end <- max(beer_data$end_qtr_dt)
 ```
 
-From `r start` to `r end`
+Date range: **`r start`** to **`r end`**
 
 ## Stats
 
@@ -118,33 +144,47 @@ beer_data_cat <- beer_data %>% group_by(end_qtr_dt, category) %>% summarize(
 ch_title <- "BC Beer: Total Net Sales by Quarter"
 beer_data_ttl %>% ggplot(aes(x=as.factor(end_qtr_dt), y=netsales))+
   geom_line(group=1)+
-  scale_y_continuous(labels=dollar_format())+
+  scale_y_continuous(labels=dollar_format(), limits=c(0,max(beer_data_ttl$netsales)))+
   labs(title=ch_title, x="", y="")+
   theme_bw()
 ```
 
-#### Compared by Same Quarter
-
-More data needed
-
-#### % change
+#### % Change - Qtr over Qtr
 
 ```{r}
-
 ch_title <- "% Change in Qtr over Qtr Beer Sales"
 beer_data_ttl %>% 
   filter(!is.na(pop_chg_pc)) %>%
   ggplot(aes(x=as.factor(end_qtr_dt), y=pop_chg_pc, fill=posneg))+
   geom_col()+
   geom_hline(yintercept=0)+
-  scale_y_continuous(labels=percent_format())+
+  scale_y_continuous(labels=percent_format(), limits=c(-1, 1), expand=expansion(mult=c(0,0)))+
   scale_fill_manual(values=pn_colors)+
   theme_classic()+theme(axis.ticks.x=element_blank())+
   theme(legend.position = "none")+
   labs(title=ch_title, x="", y="")
 ```
 
+#### Compare by Same Quarter, Year over Year
+
+More data needed
+
 ### By Category
+
+#### Breakdown by Category
+
+```{r}
+# SKIPPING - INFO AVAILABLE IN OTHER CHARTS
+# set upper limit for axis
+# max_sales <- max(beer_data_cat$netsales)
+# # generate plot from data
+# beer_data_cat %>% ggplot(aes(x=as.factor(end_qtr_dt), y=netsales, fill=category))+
+#   geom_col(position=position_dodge())+
+#   scale_fill_viridis_d(direction=-1)+
+#   scale_y_continuous(labels=comma, limits=c(0, max_sales), expand=expansion(mult=c(0,0.1)))+
+#   labs(title='Total Net BC Beer Sales by Category', x="")+
+#   theme_bw()+theme(axis.ticks.x = element_blank())
+```
 
 ```{r}
 # set max y scale
@@ -156,7 +196,9 @@ beer_data_cat$category <- reorder(beer_data_cat$category, beer_data_cat$netsales
 ttl_plot <- beer_data_cat %>% 
   ggplot(aes(x=as.factor(end_qtr_dt), y=netsales, fill=category))+
   geom_col()+
-  scale_fill_viridis_d(reverse=TRUE)+
+  # color options: viridis for bold colors, rcolorbrewer for mellower
+  #scale_fill_viridis_d(direction=-1)+
+  scale_fill_brewer(type="seq", palette = "YlGnBu")+
   scale_y_continuous(labels=dollar_format(), limits=c(0, max_sales), expand=expansion(mult=c(0,0.1)))+
   labs(title='Total Net BC Beer Sales by Category', x="", y="")+
   theme_bw()+theme(axis.ticks.x = element_blank())
@@ -171,29 +213,96 @@ beer_data_cat$category <- reorder(beer_data_cat$category, beer_data_cat$netsales
 bdc_chart <- beer_data_cat %>% 
   ggplot(aes(x=as.factor(end_qtr_dt), y=netsales, fill=category))+
   geom_col(position="fill")+
+  #scale_fill_viridis_d(direction = -1)+
+  scale_fill_brewer(type="seq", palette = "YlGnBu")+
   scale_y_continuous(labels=percent_format(), expand=expansion(mult=c(0,0)))+
   labs(title=ch_title, x="", y="")+
   theme_bw()+theme(axis.ticks.x=element_blank())
 ggplotly(bdc_chart)
 ```
 
+#### Contribution to Change
+
+-   couple of way to show this:
+
+    -   absolute value of change by category
+
+    -   \% of total change that each category makes up (sort of closer to coefficient of determination)
+
 ```{r}
-# set upper limit for axis
-max_sales <- max(beer_data_cat$netsales)
-# generate plot from data
-beer_data_cat %>% ggplot(aes(x=as.factor(end_qtr_dt), y=netsales, fill=category))+
+ch_title <- "Change by Category Qtr over Qtr"
+beer_data_cat %>% 
+  ggplot(aes(x=as.factor(end_qtr_dt), y=pop_chg, fill=category))+
   geom_col(position=position_dodge())+
-  scale_y_continuous(labels=comma, limits=c(0, max_sales), expand=expansion(mult=c(0,0.1)))+
-  labs(title='Total Net BC Beer Sales by Category', x="")+
+  #scale_fill_viridis_d(direction = -1)+
+  scale_fill_brewer(type="seq", palette = "YlGnBu")+
+  scale_y_continuous(labels=comma)+
+  labs(title=ch_title, x="", y="")+
+  theme(axis.ticks.x = element_blank())
+
+```
+
+```{r}
+ch_title <- "% Contribution to Qtr over Qtr Change"
+beer_data_cat %>% 
+  ggplot(aes(x=as.factor(end_qtr_dt), y=pop_chg, fill=category))+
+  geom_col(position="fill")+
+  geom_hline(yintercept=0)+
+  #scale_fill_viridis_d(direction=-1)+
+  scale_fill_brewer(type="seq", palette = "YlGnBu")+
+  scale_y_continuous(labels=percent_format())+
+  labs(title=ch_title, x="", y="")+
+  theme_classic()+
+  theme(axis.ticks.x=element_blank())
+  
+```
+
+#### % Change - Qtr over Qtr
+
+```{r}
+ch_title <- "% Change in Beer Sales by Category"
+beer_data_cat %>% ggplot(aes(x=as.factor(end_qtr_dt), y=pop_chg_pc, fill=category))+
+  geom_col(position=position_dodge())+
+  geom_hline(yintercept=0)+
+  #scale_fill_manual(values = pn_colors)+
+  #scale_fill_viridis_d(direction = -1)+
+  scale_fill_brewer(type="seq", palette = "YlGnBu")+
+  scale_y_continuous(labels=percent_format(), limits=c(-1, 1), expand=expansion(mult=c(0,0)))+
+  labs(title=ch_title, x="", y="")+
   theme_bw()+theme(axis.ticks.x = element_blank())
 ```
 
-### QoQ % Change
+### Correlation
 
-Total
+#### One-way Anova
 
-```{r}
+Tells us whether there is a difference in the average netsales based on categories or not.
 
+```{r echo=TRUE}
+fit <- aov(netsales ~ category, data=beer_data_cat)
+summary(fit)
 ```
 
-By Category
+Summary tells us that there is a significant difference in mean values of net sales from one category to another.
+
+#### Variable Significance
+
+Using TukeyHSD
+
+```{r echo=TRUE}
+TukeyHSD(fit)
+```
+
+The output shows the pairwise combinations. If I understand correctly:
+
+-   NO **significant difference** between net sales for '**Domestic - Other Province**' and '**Import**'.
+
+-   STRONG **significant differences** between '**Domestic - BC Beer**' and '**Import**' AND between '**Domestic - BC Beer**' and '**Domestic - Other Province**.'
+
+The conclusion is that **'Domestic - BC Beer' has the strongest influence on sales**. Which of course is clear from looking at the charts.
+
+### Linear Regression
+
+-   Spread the categories into columns
+
+-   Convert qtr into a dummy variable - spread into cols
